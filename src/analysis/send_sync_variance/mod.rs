@@ -11,14 +11,12 @@ mod utils;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::{
-    GenericBound, GenericParam, GenericParamKind, HirId, Impl, ImplPolarity, ItemId, ItemKind,
-    Node, WherePredicate,
+    GenericBound, GenericParam, HirId, Impl, ImplPolarity, ItemId, ItemKind, Node, WherePredicate,
 };
-use rustc_middle::mir::terminator::Mutability;
+use rustc_middle::mir::Mutability;
 use rustc_middle::ty::{
-    self,
-    subst::{self, GenericArgKind},
-    AssocKind, GenericParamDef, GenericParamDefKind, List, PredicateKind, Ty, TyCtxt, TyS,
+    self, AssocKind, ClauseKind, GenericArg, GenericArgKind, GenericParamDef, GenericParamDefKind,
+    List, Ty, TyCtxt,
 };
 use rustc_span::symbol::sym;
 
@@ -30,8 +28,6 @@ use crate::report::{Report, ReportLevel};
 
 use behavior::*;
 pub use phantom::*;
-pub use relaxed::*;
-pub use strict::*;
 pub use utils::*;
 
 pub struct SendSyncVarianceChecker<'tcx> {
@@ -81,7 +77,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         // Iterate over `impl`s that implement `Send`.
         let hir = self.rcx.tcx().hir();
         for &impl_id in hir.trait_impls(send_trait_did) {
-            let item = hir.item(ItemId { def_id: impl_id });
+            let owner_id = hir.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
+            let item = hir.item(ItemId { owner_id });
             if_chain! {
                 if let ItemKind::Impl(impl_item) = &item.kind;
                 if impl_item.polarity == ImplPolarity::Positive;
@@ -116,7 +113,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         // Iterate over `impl`s that implement `Sync`.
         let hir = self.rcx.tcx().hir();
         for &impl_id in hir.trait_impls(sync_trait_did) {
-            let item = hir.item(ItemId { def_id: impl_id });
+            let owner_id = hir.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
+            let item = hir.item(ItemId { owner_id });
             if_chain! {
                 if let ItemKind::Impl(impl_item) = &item.kind;
                 if impl_item.polarity == ImplPolarity::Positive;
@@ -144,7 +142,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
 /// Check Send Trait
 fn send_trait_def_id<'tcx>(tcx: TyCtxt<'tcx>) -> AnalysisResult<'tcx, DefId> {
     convert!(tcx
-        .get_diagnostic_item(sym::send_trait)
+        .get_diagnostic_item(sym::Send)
         .context(SendTraitNotFound))
 }
 

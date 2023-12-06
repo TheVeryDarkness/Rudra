@@ -1,7 +1,7 @@
 use rustc_hir::{def_id::DefId, BodyId};
 use rustc_middle::mir::Operand;
 use rustc_middle::ty::{Instance, ParamEnv, TyKind};
-use rustc_span::{Span, DUMMY_SP};
+use rustc_span::Span;
 
 use snafu::{Backtrace, Snafu};
 use termcolor::Color;
@@ -269,7 +269,7 @@ mod inner {
                             let place_ty = place.ty(self.body, tcx);
                             if let TyKind::RawPtr(ty_and_mut) = place_ty.ty.kind();
                             let pointed_ty = ty_and_mut.ty;
-                            if pointed_ty.is_copy_modulo_regions(tcx.at(DUMMY_SP), self.param_env);
+                            if pointed_ty.is_copy_modulo_regions(tcx, self.param_env);
                             then {
                                 return true;
                             }
@@ -314,7 +314,7 @@ mod inner {
         for arg in args.iter() {
             if_chain! {
                 if let Operand::Constant(c) = arg;
-                if let Some(c_val) = c.literal.try_eval_usize(
+                if let Some(c_val) = c.const_.try_eval_target_usize(
                     tcx,
                     tcx.param_env(callee_did),
                 );

@@ -2,7 +2,7 @@
 name = "crawl"
 version = "0.1.0"
 authors = ["Yechan Bae <yechan@gatech.edu>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -36,7 +36,11 @@ serde = { version = "1.0", features = ["derive"] }
 semver = { version = "0.10", features = ["serde"] }
 structopt = "0.3.18"
 # Updating syn panics the traversal
-syn = { version = "=1.0.14", default-features = false, features = ["full", "parsing", "visit"] }
+syn = { version = "=1.0.14", default-features = false, features = [
+    "full",
+    "parsing",
+    "visit",
+] }
 tar = "0.4.29"
 thiserror = "1.0"
 tokei = "10.1.2"

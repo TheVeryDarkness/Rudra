@@ -1,8 +1,8 @@
 use std::io::Write;
-use std::rc::Rc;
+use std::sync::Arc;
 
+use rustc_middle::mir::pretty::write_mir_pretty;
 use rustc_middle::ty::{Instance, InstanceDef, TyCtxt};
-use rustc_mir::util::write_mir_pretty;
 use rustc_span::{CharPos, Span};
 
 use termcolor::{Buffer, Color, ColorSpec, WriteColor};
@@ -102,7 +102,7 @@ impl<'tcx> ColorSpan<'tcx> {
         let source_map = tcx.sess.source_map();
         if let Ok((main_span_start, main_span_end)) = source_map.is_valid_span(main_span) {
             // Sanity check
-            if !Rc::ptr_eq(&main_span_start.file, &main_span_end.file) {
+            if !Arc::ptr_eq(&main_span_start.file, &main_span_end.file) {
                 return None;
             }
 
@@ -128,8 +128,8 @@ impl<'tcx> ColorSpan<'tcx> {
         let source_map = self.tcx.sess.source_map();
         if let Ok((start_loc, end_loc)) = source_map.is_valid_span(span) {
             // Reports from macros may be in another file and we don't handle them
-            if !Rc::ptr_eq(&start_loc.file, &self.main_span_start.file)
-                || !Rc::ptr_eq(&start_loc.file, &self.main_span_end.file)
+            if !Arc::ptr_eq(&start_loc.file, &self.main_span_start.file)
+                || !Arc::ptr_eq(&start_loc.file, &self.main_span_end.file)
             {
                 return false;
             }

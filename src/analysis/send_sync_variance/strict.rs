@@ -15,9 +15,11 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         let rcx = self.rcx;
         let tcx = rcx.tcx();
         if let Some(trait_ref) = tcx.impl_trait_ref(impl_id) {
-            if let ty::TyKind::Adt(adt_def, impl_trait_substs) = trait_ref.self_ty().kind() {
-                let adt_did = adt_def.did;
-                let adt_ty = tcx.type_of(adt_did);
+            if let ty::TyKind::Adt(adt_def, impl_trait_substs) =
+                trait_ref.skip_binder().self_ty().kind()
+            {
+                let adt_did = adt_def.did();
+                let adt_ty = tcx.type_of(adt_did).skip_binder();
 
                 let mut need_send_sync: FxHashMap<PostMapIdx, BehaviorFlag> = FxHashMap::default();
 
@@ -97,7 +99,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                     .iter()
                     .map(|x| x.kind().skip_binder())
                 {
-                    if let PredicateKind::Trait(trait_predicate) = atom {
+                    if let ClauseKind::Trait(trait_predicate) = atom {
                         if let ty::TyKind::Param(param_ty) = trait_predicate.self_ty().kind() {
                             let pre_map_idx = PreMapIdx(param_ty.index);
                             if let Some(mapped_idx) = generic_param_idx_map.get(&pre_map_idx) {
@@ -151,9 +153,11 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
     ) -> Option<(DefId, BehaviorFlag)> {
         let tcx = self.rcx.tcx();
         if let Some(trait_ref) = tcx.impl_trait_ref(impl_id) {
-            if let ty::TyKind::Adt(adt_def, impl_trait_substs) = trait_ref.self_ty().kind() {
-                let adt_did = adt_def.did;
-                let adt_ty = tcx.type_of(adt_did);
+            if let ty::TyKind::Adt(adt_def, impl_trait_substs) =
+                trait_ref.skip_binder().self_ty().kind()
+            {
+                let adt_did = adt_def.did();
+                let adt_ty = tcx.type_of(adt_did).skip_binder();
 
                 // Keep track of generic params that need to be `Send`.
                 // let mut need_send: FxHashSet<PostMapIdx> = FxHashSet::default();
@@ -212,7 +216,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                     .iter()
                     .map(|x| x.kind().skip_binder())
                 {
-                    if let PredicateKind::Trait(trait_predicate) = atom {
+                    if let ClauseKind::Trait(trait_predicate) = atom {
                         if let ty::TyKind::Param(param_ty) = trait_predicate.self_ty().kind() {
                             let pre_map_idx = PreMapIdx(param_ty.index);
                             if let Some(mapped_idx) = generic_param_idx_map.get(&pre_map_idx) {

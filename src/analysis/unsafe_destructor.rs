@@ -1,9 +1,10 @@
 //! Unsafe destructor detector
 use rustc_hir::def_id::DefId;
-use rustc_hir::intravisit::{self, NestedVisitorMap, Visitor};
+use rustc_hir::intravisit::{self, Visitor};
 use rustc_hir::{
     Block, BodyId, Expr, HirId, Impl, ImplItemId, ImplItemKind, ItemKind, Node, Unsafety,
 };
+use rustc_middle::hir::nested_filter::OnlyBodies;
 use rustc_middle::ty::TyCtxt;
 
 use snafu::{Backtrace, OptionExt, Snafu};
@@ -139,10 +140,10 @@ mod inner {
     }
 
     impl<'tcx> Visitor<'tcx> for UnsafeDestructorVisitor<'tcx> {
-        type Map = rustc_middle::hir::map::Map<'tcx>;
+        type NestedFilter = OnlyBodies;
 
-        fn nested_visit_map(&mut self) -> NestedVisitorMap<Self::Map> {
-            NestedVisitorMap::OnlyBodies(self.rcx.tcx().hir())
+        fn nested_visit_map(&mut self) -> Self::Map {
+            self.rcx.tcx().hir()
         }
 
         fn visit_block(&mut self, block: &'tcx Block<'tcx>) {
@@ -164,7 +165,7 @@ mod inner {
             if self.unsafe_nest_level > 0 {
                 // If non-extern unsafe function call is detected in unsafe block
                 if let Some(fn_def_id) = expr.ext().as_fn_def_id(tcx) {
-                    let ty = tcx.type_of(fn_def_id);
+                    let ty = tcx.type_of(fn_def_id).skip_binder();
                     if let Ok(Unsafety::Unsafe) = tcx.ext().fn_type_unsafety(ty) {
                         if !tcx.is_foreign_item(fn_def_id) {
                             self.unsafe_found = true;

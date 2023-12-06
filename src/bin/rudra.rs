@@ -1,9 +1,10 @@
-#![feature(backtrace)]
 #![feature(rustc_private)]
 
 extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_interface;
+extern crate rustc_session;
+extern crate rustc_span;
 
 #[macro_use]
 extern crate log;
@@ -16,6 +17,8 @@ use rustc_interface::{interface::Compiler, Queries};
 use rudra::log::Verbosity;
 use rudra::report::{default_report_logger, init_report_logger, ReportLevel};
 use rudra::{analyze, compile_time_sysroot, progress_info, RudraConfig, RUDRA_DEFAULT_ARGS};
+use rustc_session::{config::ErrorOutputType, EarlyErrorHandler};
+use rustc_span::def_id::LOCAL_CRATE;
 
 struct RudraCompilerCalls {
     config: RudraConfig,
@@ -33,23 +36,23 @@ impl rustc_driver::Callbacks for RudraCompilerCalls {
         compiler: &Compiler,
         queries: &'tcx Queries<'tcx>,
     ) -> Compilation {
-        compiler.session().abort_if_errors();
+        compiler.sess.abort_if_errors();
 
         rudra::log::setup_logging(self.config.verbosity).expect("Rudra failed to initialize");
 
         debug!(
             "Input file name: {}",
-            compiler.input().source_name().prefer_local()
+            compiler.sess.io.input.source_name().prefer_local()
         );
-        debug!("Crate name: {}", queries.crate_name().unwrap().peek_mut());
 
         progress_info!("Rudra started");
-        queries.global_ctxt().unwrap().peek_mut().enter(|tcx| {
+        queries.global_ctxt().unwrap().enter(|tcx| {
+            debug!("Crate name: {}", tcx.crate_name(LOCAL_CRATE));
             analyze(tcx, self.config);
         });
         progress_info!("Rudra finished");
 
-        compiler.session().abort_if_errors();
+        compiler.sess.abort_if_errors();
         Compilation::Stop
     }
 }
@@ -121,7 +124,9 @@ fn parse_config() -> (RudraConfig, Vec<String>) {
 }
 
 fn main() {
-    rustc_driver::install_ice_hook(); // ICE: Internal Compilation Error
+    let handler = EarlyErrorHandler::new(ErrorOutputType::default());
+
+    rustc_driver::install_ice_hook(rustc_driver::DEFAULT_BUG_REPORT_URL, |_| ()); // ICE: Internal Compilation Error
 
     let exit_code = {
         // initialize the report logger
@@ -131,7 +136,7 @@ fn main() {
 
         // init rustc logger
         if env::var_os("RUSTC_LOG").is_some() {
-            rustc_driver::init_rustc_env_logger();
+            rustc_driver::init_rustc_env_logger(&handler);
         }
 
         if let Some(sysroot) = compile_time_sysroot() {

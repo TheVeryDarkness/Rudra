@@ -9,7 +9,7 @@ pub fn phantom_indices<'tcx>(tcx: TyCtxt<'tcx>, adt_ty: Ty<'tcx>) -> Vec<u32> {
     let (mut in_phantom, mut out_phantom) = (FxHashSet::default(), FxHashSet::default());
 
     if let ty::TyKind::Adt(adt_def, substs) = adt_ty.kind() {
-        for variant in &adt_def.variants {
+        for variant in adt_def.variants() {
             for field in &variant.fields {
                 let field_ty = field.ty(tcx, substs);
 

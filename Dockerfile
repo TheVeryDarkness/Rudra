@@ -8,46 +8,35 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     RUST_VERSION=nightly-2021-08-20 \
     SCCACHE_VERSION=v0.2.15
 
-ENV RUSTFLAGS="-L ${RUSTUP_HOME}/toolchains/${RUST_VERSION}-x86_64-unknown-linux-gnu/lib" \
-    LD_LIBRARY_PATH="${RUSTUP_HOME}/toolchains/${RUST_VERSION}-x86_64-unknown-linux-gnu/lib"
+ENV RUSTFLAGS="-L ${RUSTUP_HOME}/toolchains/${RUST_VERSION}-aarch64-unknown-linux-gnu/lib" \
+    LD_LIBRARY_PATH="${RUSTUP_HOME}/toolchains/${RUST_VERSION}-aarch64-unknown-linux-gnu/lib"
+
+# Thanks to https://mirrors.tuna.tsinghua.edu.cn/help/rustup/
+# for bash
+RUN echo 'export RUSTUP_UPDATE_ROOT=https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup' >> ~/.bash_profile && \
+    echo 'export RUSTUP_DIST_SERVER=https://mirrors.tuna.tsinghua.edu.cn/rustup' >> ~/.bash_profile
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Install Rust
 RUN set -eux; \
-    dpkgArch="$(dpkg --print-architecture)"; \
-    case "${dpkgArch##*-}" in \
-        amd64) rustArch='x86_64-unknown-linux-gnu'; rustupSha256='ed7773edaf1d289656bdec2aacad12413b38ad0193fff54b2231f5140a4b07c5' ;; \
-        # arm64) rustArch='aarch64-unknown-linux-gnu'; rustupSha256='f80a0a792b3ab905ab4919474daf4d3f60e574fc6987e69bfba2fd877241a8de' ;; \
-        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
-    esac; \
-    url="https://static.rust-lang.org/rustup/archive/1.23.1/${rustArch}/rustup-init"; \
-    wget "$url"; \
-    echo "${rustupSha256} *rustup-init" | sha256sum -c -; \
-    chmod +x rustup-init; \
-    ./rustup-init -y --no-modify-path --profile minimal --default-toolchain $RUST_VERSION --default-host ${rustArch}; \
-    rm rustup-init; \
-    chmod -R a+w $RUSTUP_HOME $CARGO_HOME; \
+    rustup default $RUST_VERSION; \
     rustup component add rustc-dev; \
     rustup --version; \
     cargo --version; \
     rustc --version;
 
+COPY ./docker/sources.list /etc/apt/sources.list
+
 # Install sccache
 RUN set -eux; \
-    dpkgArch="$(dpkg --print-architecture)"; \
-    case "${dpkgArch##*-}" in \
-        amd64) sccacheArch='x86_64'; sccacheSha256='e5d03a9aa3b9fac7e490391bbe22d4f42c840d31ef9eaf127a03101930cbb7ca' ;; \
-        # arm64) sccacheArch='aarch64'; sccacheSha256='90d91d21a767e3f558196dbd52395f6475c08de5c4951a4c8049575fa6894489' ;; \
-        *) echo >&2 "unsupported architecture: ${dpkgArch}"; exit 1 ;; \
-    esac; \
-    dirname="sccache-${SCCACHE_VERSION}-${sccacheArch}-unknown-linux-musl"; \
-    filename="${dirname}.tar.gz"; \
-    url="https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${filename}"; \
-    wget "$url"; \
-    echo "${sccacheSha256} *${filename}" | sha256sum -c -; \
-    tar -xvzf ${filename}; \
-    mv ${dirname}/sccache /usr/local/bin/sccache; \
-    chmod +x /usr/local/bin/sccache; \
-    rm -rf ${filename} ${dirname};
+    apt-get update;
+COPY sccache-v0.2.15-aarch64-unknown-linux-musl/sccache /usr/local/bin/sccache
+
+COPY ./docker/env.sh /root/env.sh
+RUN cat /root/env.sh >> /root/.bash_profile && rm /root/env.sh
+
+COPY ./docker/config /root/config
+RUN cat /root/config >> $CARGO_HOME/config && rm /root/config
 
 # Install Rudra
 COPY rust-toolchain.toml /tmp/rust-toolchain.toml
@@ -55,6 +44,8 @@ COPY crawl /tmp/crawl
 RUN set -eux; \
     cargo install --locked --path /tmp/crawl --bin rudra-runner --bin unsafe-counter; \
     rm -rf /tmp/rust-toolchain.toml /tmp/crawl;
+
+RUN apt-get install -y cmake clang
 
 COPY . /tmp/rudra/
 RUN set -eux; \

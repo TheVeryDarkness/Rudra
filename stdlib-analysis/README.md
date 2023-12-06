@@ -58,7 +58,7 @@ the latest nightly Rust standard library with:
 rustup toolchain install nightly
 rustup +nightly component add rust-src
 
-export XARGO_RUST_SRC=/home/ammar/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library
+export XARGO_RUST_SRC=/home/ammar/.rustup/toolchains/nightly-aarch64-unknown-linux-gnu/lib/rustlib/src/rust/library
 ./rudra_analyze_std.sh
 ```
 

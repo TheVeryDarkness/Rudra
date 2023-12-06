@@ -3,7 +3,7 @@ use super::*;
 // Note that len(adt_generics_iter) == len(substs_generics_iter)
 pub fn generic_param_idx_mapper<'tcx>(
     adt_generics: &Vec<GenericParamDef>,
-    substs_generics: &'tcx List<subst::GenericArg<'tcx>>,
+    substs_generics: &'tcx List<GenericArg<'tcx>>,
 ) -> FxHashMap<PreMapIdx, PostMapIdx> {
     let mut generic_param_idx_mapper = FxHashMap::default();
     for (original, substituted) in adt_generics.iter().zip(substs_generics.iter()) {
@@ -64,8 +64,8 @@ pub fn owned_generic_params_in_ty<'tcx>(
 
                 // Try limiting to cases like Option<T> & Result<T, !> to reduce FP rate.
                 for path in OWNING_ADTS {
-                    if ext.match_def_path(adt_def.did, path) {
-                        for adt_variant in adt_def.variants.iter() {
+                    if ext.match_def_path(adt_def.did(), path) {
+                        for adt_variant in adt_def.variants().iter() {
                             for adt_field in adt_variant.fields.iter() {
                                 let ty = adt_field.ty(tcx, substs);
                                 if let ty::TyKind::Param(_) = ty.kind() {
@@ -77,10 +77,15 @@ pub fn owned_generic_params_in_ty<'tcx>(
                 }
             }
             ty::TyKind::Array(ty, _) => {
-                worklist.push(ty);
+                worklist.push(ty.clone());
             }
-            ty::TyKind::Tuple(substs) => {
-                for ty in substs.types() {
+            // ty::TyKind::Tuple(substs) => {
+            //     for ty in substs.types() {
+            //         worklist.push(ty);
+            //     }
+            // }
+            ty::TyKind::Tuple(types) => {
+                for ty in types.iter() {
                     worklist.push(ty);
                 }
             }
@@ -114,7 +119,7 @@ pub fn borrowed_generic_params_in_ty<'tcx>(
                 }
             }
             ty::TyKind::Ref(_, borrowed_ty, Mutability::Not) => {
-                worklist.push((borrowed_ty, true));
+                worklist.push((borrowed_ty.clone(), true));
             }
             ty::TyKind::Adt(adt_def, substs) => {
                 if ty.is_box() {
@@ -122,7 +127,7 @@ pub fn borrowed_generic_params_in_ty<'tcx>(
                     continue;
                 }
 
-                for adt_variant in adt_def.variants.iter() {
+                for adt_variant in adt_def.variants().iter() {
                     for adt_field in adt_variant.fields.iter() {
                         let adt_field_ty = adt_field.ty(tcx, substs);
                         // We peel off just one level of ADT layer when trying to find exposed `&T`.
@@ -135,10 +140,10 @@ pub fn borrowed_generic_params_in_ty<'tcx>(
                 }
             }
             ty::TyKind::Array(ty, _) => {
-                worklist.push((ty, borrowed));
+                worklist.push((ty.clone(), borrowed));
             }
-            ty::TyKind::Tuple(substs) => {
-                for ty in substs.types() {
+            ty::TyKind::Tuple(types) => {
+                for ty in types.iter() {
                     worklist.push((ty, borrowed));
                 }
             }
@@ -176,9 +181,9 @@ pub fn find_pseudo_owned_in_fn_ctxt<'tcx>(
         .iter()
         .map(|x| x.kind().skip_binder())
     {
-        if let PredicateKind::Trait(trait_predicate) = atom {
+        if let ClauseKind::Trait(trait_predicate) = atom {
             if let ty::TyKind::Param(param_ty) = trait_predicate.self_ty().kind() {
-                let substs = trait_predicate.trait_ref.substs;
+                let substs = trait_predicate.trait_ref.args;
                 let substs_types = substs.types().collect::<Vec<_>>();
 
                 // trait_predicate =>  M: Into<P>

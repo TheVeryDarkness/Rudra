@@ -17,8 +17,8 @@ rustup component add miri
 export RUDRA_RUST_CHANNEL=nightly-2021-08-20
 export RUDRA_RUNNER_HOME="<your runner home path - use setup_rudra_runner_home.py>"
 
-export RUSTFLAGS="-L $HOME/.rustup/toolchains/${RUDRA_RUST_CHANNEL}-x86_64-unknown-linux-gnu/lib"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$HOME/.rustup/toolchains/${RUDRA_RUST_CHANNEL}-x86_64-unknown-linux-gnu/lib"
+export RUSTFLAGS="-L $HOME/.rustup/toolchains/${RUDRA_RUST_CHANNEL}-aarch64-unknown-linux-gnu/lib"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:$HOME/.rustup/toolchains/${RUDRA_RUST_CHANNEL}-aarch64-unknown-linux-gnu/lib"
 
 # Test your installation
 python test.py

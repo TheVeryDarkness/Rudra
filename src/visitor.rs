@@ -1,10 +1,9 @@
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::{
     def_id::{DefId, LocalDefId},
-    intravisit,
-    itemlikevisit::ItemLikeVisitor,
-    Block, BodyId, HirId, Impl, ItemKind,
+    intravisit, Block, BodyId, HirId, Impl, ItemKind,
 };
+use rustc_middle::hir::nested_filter::OnlyBodies;
 use rustc_middle::ty::{Ty, TyCtxt, TyKind};
 use rustc_span::Span;
 
@@ -27,13 +26,20 @@ impl<'tcx> RelatedFnCollector<'tcx> {
             hash_map: RelatedItemMap::default(),
         };
 
-        tcx.hir().krate().visit_all_item_likes(&mut collector);
+        // tcx.hir().krate().visit_all_item_likes(&mut collector);
+        tcx.hir().visit_all_item_likes_in_crate(&mut collector);
 
         collector.hash_map
     }
 }
 
-impl<'tcx> ItemLikeVisitor<'tcx> for RelatedFnCollector<'tcx> {
+impl<'tcx> intravisit::Visitor<'tcx> for RelatedFnCollector<'tcx> {
+    type NestedFilter = OnlyBodies;
+
+    fn nested_visit_map(&mut self) -> Self::Map {
+        self.tcx.hir()
+    }
+
     fn visit_item(&mut self, item: &'tcx rustc_hir::Item<'tcx>) {
         let hir_map = self.tcx.hir();
         match &item.kind {
@@ -47,9 +53,10 @@ impl<'tcx> ItemLikeVisitor<'tcx> for RelatedFnCollector<'tcx> {
                 let key = Some(self_ty.hir_id);
                 let entry = self.hash_map.entry(key).or_insert(Vec::new());
                 entry.extend(impl_items.iter().filter_map(|impl_item_ref| {
-                    let hir_id = impl_item_ref.id.hir_id();
+                    // let hir_id = impl_item_ref.id.hir_id();
+                    let local_def_id = impl_item_ref.id.owner_id.def_id;
                     hir_map
-                        .maybe_body_owned_by(hir_id)
+                        .maybe_body_owned_by(local_def_id)
                         .map(|body_id| (body_id, impl_item_ref.span))
                 }));
             }
@@ -58,9 +65,10 @@ impl<'tcx> ItemLikeVisitor<'tcx> for RelatedFnCollector<'tcx> {
                 let key = None;
                 let entry = self.hash_map.entry(key).or_insert(Vec::new());
                 entry.extend(trait_items.iter().filter_map(|trait_item_ref| {
-                    let hir_id = trait_item_ref.id.hir_id();
+                    // let hir_id = trait_item_ref.id.hir_id();
+                    let local_def_id = trait_item_ref.id.owner_id.def_id;
                     hir_map
-                        .maybe_body_owned_by(hir_id)
+                        .maybe_body_owned_by(local_def_id)
                         .map(|body_id| (body_id, trait_item_ref.span))
                 }));
             }
@@ -111,10 +119,10 @@ impl<'tcx> ContainsUnsafe<'tcx> {
 }
 
 impl<'tcx> intravisit::Visitor<'tcx> for ContainsUnsafe<'tcx> {
-    type Map = rustc_middle::hir::map::Map<'tcx>;
+    type NestedFilter = OnlyBodies;
 
-    fn nested_visit_map(&mut self) -> intravisit::NestedVisitorMap<Self::Map> {
-        intravisit::NestedVisitorMap::OnlyBodies(self.tcx.hir())
+    fn nested_visit_map(&mut self) -> Self::Map {
+        self.tcx.hir()
     }
 
     fn visit_block(&mut self, block: &'tcx Block<'tcx>) {
@@ -139,10 +147,11 @@ pub type AdtImplMap<'tcx> = FxHashMap<DefId, Vec<(LocalDefId, Ty<'tcx>)>>;
 pub fn create_adt_impl_map<'tcx>(tcx: TyCtxt<'tcx>) -> AdtImplMap<'tcx> {
     let mut map = FxHashMap::default();
 
-    for item in tcx.hir().krate().items() {
+    for id in tcx.hir_crate_items(()).items() {
+        let item = tcx.hir().item(id);
         if let ItemKind::Impl(Impl { self_ty, .. }) = item.kind {
             // `Self` type of the given impl block.
-            let impl_self_ty = tcx.type_of(self_ty.hir_id.owner);
+            let impl_self_ty = tcx.type_of(self_ty.hir_id.owner).skip_binder();
 
             if let TyKind::Adt(impl_self_adt_def, _impl_substs) = impl_self_ty.kind() {
                 // We use `AdtDef.did` as key for `AdtImplMap`.
@@ -150,9 +159,9 @@ pub fn create_adt_impl_map<'tcx>(tcx: TyCtxt<'tcx>) -> AdtImplMap<'tcx> {
                 // `AdtDef.did` refers to the original ADT definition.
                 // Thus it can be used to map & collect impls for all instantitations of the same ADT.
 
-                map.entry(impl_self_adt_def.did)
+                map.entry(impl_self_adt_def.did())
                     .or_insert_with(|| Vec::new())
-                    .push((item.def_id, impl_self_ty));
+                    .push((item.owner_id.def_id, impl_self_ty));
             }
         }
     }
