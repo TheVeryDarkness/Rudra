@@ -1,4 +1,4 @@
 [toolchain]
 # Update rudra-runner.rs when updating the compiler version
-channel = "nightly"
+channel = "nightly-2023-11-23"
 components = ["rustc-dev", "llvm-tools"]
