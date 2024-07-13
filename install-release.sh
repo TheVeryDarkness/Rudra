@@ -1,2 +1,2 @@
 #!/bin/bash
-cargo install --locked --path "$(dirname "$0")" --force
+cargo install --path "$(dirname "$0")" --force

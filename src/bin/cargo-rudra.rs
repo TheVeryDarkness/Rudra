@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use std::time::Duration;
 
 use cargo_metadata::{DependencyKind, Metadata, PackageId};
@@ -46,9 +46,9 @@ fn has_arg_flag(name: &str) -> bool {
 }
 
 /// Gets the value of a `--flag`.
-fn get_arg_flag_value(name: &str) -> Option<String> {
+fn get_arg_flag_value(name: &str, stop: bool) -> Option<String> {
     // Stop searching at `--`.
-    let mut args = std::env::args().take_while(|val| val != "--");
+    let mut args = std::env::args().take_while(|val| !stop || val != "--");
     loop {
         let arg = match args.next() {
             Some(arg) => arg,
@@ -168,13 +168,13 @@ fn cargo_workspace(metadata: &Metadata) -> Vec<cargo_metadata::Package> {
 }
 
 fn get_manifest_path() -> Option<PathBuf> {
-    get_arg_flag_value("--manifest-path").map(|m| Path::new(&m).to_path_buf())
+    get_arg_flag_value("--manifest-path", true).map(|m| Path::new(&m).to_path_buf())
 }
 
 fn get_meta() -> Metadata {
     // We need to get the manifest, and then the metadata, to enumerate targets.
     let manifest_path =
-        get_arg_flag_value("--manifest-path").map(|m| Path::new(&m).canonicalize().unwrap());
+        get_arg_flag_value("--manifest-path", true).map(|m| Path::new(&m).canonicalize().unwrap());
 
     let mut cmd = cargo_metadata::MetadataCommand::new();
     if let Some(manifest_path) = &manifest_path {
@@ -203,28 +203,39 @@ fn find_rudra() -> PathBuf {
 /// This can be violated e.g. when rudra is locally built and installed with a different
 /// toolchain than what is used when `cargo rudra` is run.
 fn test_sysroot_consistency() {
-    fn get_sysroot(mut cmd: Command) -> PathBuf {
-        let out = cmd
-            .arg("--print")
-            .arg("sysroot")
-            .output()
-            .expect(&format!("Failed to run {:?} to get sysroot info", cmd));
-        let stdout = String::from_utf8(out.stdout).expect("stdout is not valid UTF-8");
-        let stderr = String::from_utf8(out.stderr).expect("stderr is not valid UTF-8");
+    fn get_sysroot(cmd: impl AsRef<Path>) -> PathBuf {
+        let mut command = Command::new(cmd.as_ref());
+        command.arg("--print").arg("sysroot");
+        let out = command.output().expect(
+            &format!("Failed to run {:?} to get sysroot info", cmd.as_ref())
+        );
+        // println!("{:?}", out);
+        let Output {
+            status,
+            stdout,
+            stderr,
+        } = out;
+        let stdout = String::from_utf8(stdout).expect("stdout is not valid UTF-8");
+        let stderr = String::from_utf8(stderr).expect("stderr is not valid UTF-8");
         let stdout = stdout.trim();
         assert!(
-            out.status.success(),
-            "Bad status code when getting sysroot info.\nstdout:\n{}\nstderr:\n{}",
+            status.success(),
+            "Bad status code {} when getting sysroot info.\nstdout:\n{}\nstderr:\n{}command:\n{:?}",
+            status,
             stdout,
-            stderr
+            stderr,
+            command,
         );
         PathBuf::from(stdout)
             .canonicalize()
             .unwrap_or_else(|_| panic!("Failed to canonicalize sysroot: {}", stdout))
     }
 
-    let rustc_sysroot = get_sysroot(Command::new("rustc"));
-    let rudra_sysroot = get_sysroot(Command::new(find_rudra()));
+    // println!("{:?}", Command::new("rustc").arg("--version").output().unwrap());
+    // println!("{:?}", Command::new("rustc").arg("--print").arg("sysroot").output().unwrap());
+    // println!("Checking sysroot consistency");
+    let rustc_sysroot = get_sysroot("rustc");
+    let rudra_sysroot = get_sysroot(find_rudra());
 
     if rustc_sysroot != rudra_sysroot {
         show_error(format!(
@@ -238,12 +249,9 @@ fn test_sysroot_consistency() {
     }
 }
 
-fn clean_package(package_name: &str, manifest_path: Option<&PathBuf>) {
+fn clean_package(manifest_path: Option<&PathBuf>) {
     let mut cmd = Command::new("cargo");
     cmd.arg("clean");
-
-    cmd.arg("-p");
-    cmd.arg(package_name);
 
     if let Some(manifest_path) = manifest_path {
         cmd.arg("--manifest-path").arg(manifest_path);
@@ -350,6 +358,9 @@ fn in_cargo_rudra() {
 
     let manifest_path = get_manifest_path();
 
+    // Clean the result to disable Cargo's freshness check
+    // clean_package(manifest_path.as_ref());
+
     for package in &packages {
         let mut targets = package.targets.clone();
 
@@ -384,8 +395,6 @@ fn in_cargo_rudra() {
                 TargetKind::Library => {
                     // There can be only one lib in a crate.
                     cmd.arg("--lib");
-                    // Clean the result to disable Cargo's freshness check
-                    clean_package(&package.name, manifest_path.as_ref());
                 }
                 TargetKind::Unknown => {
                     warn!(
@@ -412,7 +421,7 @@ fn in_cargo_rudra() {
             // We want to always run `cargo` with `--target`. This later helps us detect
             // which crates are proc-macro/build-script (host crates) and which crates are
             // needed for the program itself.
-            if get_arg_flag_value("--target").is_none() {
+            if get_arg_flag_value("--target", false).is_none() {
                 // When no `--target` is given, default to the host.
                 cmd.arg("--target");
                 cmd.arg(version_info().host);
@@ -485,7 +494,7 @@ fn inside_cargo_rustc() {
     /// which hopefully makes it "reliable enough". This relies on us always
     /// invoking cargo itself with `--target`, which `in_cargo_rudra` ensures.
     fn contains_target_flag() -> bool {
-        get_arg_flag_value("--target").is_some()
+        get_arg_flag_value("--target", false).is_some()
     }
 
     /// Returns whether we are building the target crate.

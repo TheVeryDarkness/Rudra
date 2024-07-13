@@ -38,4 +38,4 @@ docker run -t --rm --user "$(id -u)":"$(id -g)" -v "$RUDRA_RUNNER_HOME":/tmp/rud
     --env SCCACHE_DIR=/tmp/rudra-runner-home/sccache_home --env SCCACHE_CACHE_SIZE=10T \
     --env RUSTUP_TOOLCHAIN="$RUDRA_RUSTUP_TOOLCHAIN" \
     --env RUSTFLAGS="-Awarnings" \
-    -v "$(realpath $1)":/tmp/rudra -it -w /tmp/rudra rudra:latest cargo rudra --color never -Z namespaced-features ${CARGO_ARGS} -- -v -Adeprecated -Zsensitivity-high -Zrudra-enable-unsafe-destructor
+    -v "$(realpath $1)":/tmp/rudra -it -w /tmp/rudra rudra:latest cargo rudra --color never ${CARGO_ARGS} -- -vv -Adeprecated -Zsensitivity-high -Zrudra-enable-unsafe-destructor
