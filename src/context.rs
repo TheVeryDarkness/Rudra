@@ -142,11 +142,11 @@ impl<'tcx> RudraCtxtOwner<'tcx> {
                     func: func_operand,
                     args,
                     destination,
-                    target,
+                    target: Some(target),
                     ..
                 } => {
                     // let cleanup = cleanup.clone().map(|block| block.index());
-                    let destination = Some((destination.clone(), target.unwrap().index()));
+                    let destination = Some((destination.clone(), target.index()));
 
                     if let mir::Operand::Constant(box func) = func_operand {
                         let func_ty = func.ty();

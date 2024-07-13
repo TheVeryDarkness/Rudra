@@ -33,7 +33,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                 // Inspect immediate trait bounds on generic parameters
                 if self.trait_in_imm_relaxed(
                     &[send_trait_def_id, sync_trait_def_id],
-                    generics.params
+                    generics.params,
+                    generics.predicates,
                 ) {
                     return false;
                 }
@@ -75,7 +76,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                 // Inspect immediate trait bounds on generic parameters
                 if self.trait_in_imm_relaxed(
                    &[sync_trait_def_id],
-                   generics.params
+                   generics.params,
+                   generics.predicates,
                 ) {
                    return false;
                 }
@@ -93,6 +95,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         &self,
         _target_trait_def_ids: &[DefId],
         _generic_params: &[GenericParam],
+        _predicates: &[WherePredicate],
     ) -> bool {
         // Can not get immediate trait bounds from generic parameters in current rustc version.
         // for generic_param in generic_params {
@@ -106,7 +109,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
 
         //                     // Check super-traits
         //                     for p in self.rcx.tcx().super_predicates_of(def_id).predicates {
-        //                         if let PredicateKind::Trait(x) = p.0.kind().skip_binder() {
+        //                         if let ClauseKind::Trait(x) = p.0.kind().skip_binder() {
         //                             if target_trait_def_ids.contains(&x.trait_ref.def_id) {
         //                                 return true;
         //                             }
