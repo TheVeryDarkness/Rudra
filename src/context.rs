@@ -155,12 +155,12 @@ impl<'tcx> RudraCtxtOwner<'tcx> {
                                 ir::TerminatorKind::StaticCall {
                                     callee_did: def_id.clone(),
                                     callee_substs,
-                                    args: args.clone(),
+                                    args: args.iter().map(|arg| arg.node.clone()).collect(),
                                     // cleanup,
                                     destination,
                                 }
                             }
-                            TyKind::FnPtr(_) => ir::TerminatorKind::FnPtr {
+                            TyKind::FnPtr(_, _) => ir::TerminatorKind::FnPtr {
                                 value: func.const_.clone(),
                             },
                             _ => panic!("invalid callee of type {:?}", func_ty),

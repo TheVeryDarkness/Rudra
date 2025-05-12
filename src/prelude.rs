@@ -2,9 +2,9 @@ use rustc_hir::definitions::{DefPathData, DisambiguatedDefPathData};
 use rustc_hir::{
     def::Res,
     def_id::{CrateNum, DefId},
-    Expr, ExprKind, Unsafety,
+    Expr, ExprKind, Safety,
 };
-use rustc_middle::ty::print::{with_no_trimmed_paths, PrintError, Printer};
+use rustc_middle::ty::print::{with_no_trimmed_paths, PrintError, PrintTraitRefExt as _, Printer};
 use rustc_middle::ty::{self, GenericArg, Ty, TyCtxt};
 
 use rustc_span::Symbol;
@@ -51,15 +51,15 @@ pub struct TyCtxtExtension<'tcx> {
 }
 
 impl<'tcx> TyCtxtExtension<'tcx> {
-    pub fn fn_type_unsafety(self, ty: Ty<'tcx>) -> AnalysisResult<'tcx, Unsafety> {
+    pub fn fn_type_unsafety(self, ty: Ty<'tcx>) -> AnalysisResult<'tcx, Safety> {
         match ty.kind() {
-            ty::FnDef(..) | ty::FnPtr(_) => {
+            ty::FnDef(..) | ty::FnPtr(..) => {
                 let sig = ty.fn_sig(self.tcx);
-                Ok(sig.unsafety())
+                Ok(sig.safety())
             }
             ty::Closure(_def_id, substs) => {
                 let sig = substs.as_closure().sig();
-                Ok(sig.unsafety())
+                Ok(sig.safety())
             }
             _ => convert!(NonFunctionType.fail()),
         }
@@ -218,7 +218,7 @@ impl<'tcx> ExprExtension<'tcx> {
     /// Returns `Some(def_id)` if expression is a function
     /// Returns `None` if expression is not a function or error happens
     pub fn as_fn_def_id(self, tcx: TyCtxt<'tcx>) -> Option<DefId> {
-        if !tcx.has_typeck_results(self.expr.hir_id.owner) {
+        if !tcx.has_typeck_results(self.expr.hir_id.owner.def_id) {
             log_err!(InvalidOwner);
             return None;
         }

@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 use super::*;
+use rustc_hir::{intravisit::Map, WherePredicateKind};
 
 // We may not use the relaxed versions at all,
 // but keeping them alive just in case..
@@ -15,8 +16,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         sync_trait_def_id: DefId,
     ) -> bool {
         let map = self.rcx.tcx().hir();
+        let node = map.hir_node(hir_id);
         if_chain! {
-            if let Some(node) = map.find(hir_id);
             if let Node::Item(item) = node;
             if let ItemKind::Impl(Impl {
                 ref generics,
@@ -58,8 +59,8 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         sync_trait_def_id: DefId,
     ) -> bool {
         let map = self.rcx.tcx().hir();
+        let node = map.hir_node(hir_id);
         if_chain! {
-            if let Some(node) = map.find(hir_id);
             if let Node::Item(item) = node;
             if let ItemKind::Impl(Impl {
                 ref generics,
@@ -129,7 +130,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         where_predicates: &[WherePredicate],
     ) -> bool {
         for where_predicate in where_predicates {
-            if let WherePredicate::BoundPredicate(x) = where_predicate {
+            if let WherePredicateKind::BoundPredicate(x) = where_predicate.kind {
                 for bound in x.bounds {
                     if let GenericBound::Trait(y, ..) = bound {
                         if let Some(def_id) = y.trait_ref.trait_def_id() {
@@ -137,7 +138,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                                 return true;
                             }
 
-                            for p in self.rcx.tcx().super_predicates_of(def_id).predicates {
+                            for p in self.rcx.tcx().predicates_of(def_id).predicates {
                                 if let ClauseKind::Trait(z) = p.0.kind().skip_binder() {
                                     if target_trait_def_ids.contains(&z.trait_ref.def_id) {
                                         return true;

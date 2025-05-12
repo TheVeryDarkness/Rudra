@@ -88,7 +88,7 @@ impl Report {
         U: Into<Cow<'static, str>>,
     {
         let hir_map = tcx.hir();
-        let item_hir_id = hir_map.local_def_id_to_hir_id(item_hir_id);
+        let item_hir_id = tcx.local_def_id_to_hir_id(item_hir_id);
         let span = hir_map.span(item_hir_id);
 
         let source_map = tcx.sess.source_map();

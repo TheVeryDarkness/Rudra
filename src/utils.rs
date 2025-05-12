@@ -2,7 +2,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use rustc_middle::mir::pretty::write_mir_pretty;
-use rustc_middle::ty::{Instance, InstanceDef, TyCtxt};
+use rustc_middle::ty::{Instance, InstanceKind, TyCtxt};
 use rustc_span::{CharPos, Span};
 
 use termcolor::{Buffer, Color, ColorSpec, WriteColor};
@@ -250,7 +250,7 @@ pub fn print_mir<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>) {
     info!("Printing MIR for {:?}", instance);
 
     match instance.def {
-        InstanceDef::Item(_) => {
+        InstanceKind::Item(_) => {
             if tcx.is_mir_available(instance.def.def_id()) {
                 let stderr = std::io::stderr();
                 let mut handle = stderr.lock();
@@ -274,7 +274,7 @@ pub fn print_mir_to_file<'tcx>(tcx: TyCtxt<'tcx>, instance: Instance<'tcx>, outp
     info!("Printing MIR for {:?} to {}", instance, filename);
 
     match instance.def {
-        InstanceDef::Item(_) => {
+        InstanceKind::Item(_) => {
             if tcx.is_mir_available(instance.def.def_id()) {
                 let mut handle =
                     std::fs::File::create(filename).expect("Error while creating file");
