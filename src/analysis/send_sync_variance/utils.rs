@@ -53,8 +53,8 @@ pub fn owned_generic_params_in_ty<'tcx>(
                 owned_generic_params.insert(param_ty.index);
             }
             ty::TyKind::Adt(adt_def, substs) => {
-                if ty.is_box() {
-                    worklist.push(ty.boxed_ty());
+                if let Some(boxed_ty) = ty.boxed_ty() {
+                    worklist.push(boxed_ty);
                     continue;
                 }
                 // TODO:
@@ -122,8 +122,8 @@ pub fn borrowed_generic_params_in_ty<'tcx>(
                 worklist.push((borrowed_ty.clone(), true));
             }
             ty::TyKind::Adt(adt_def, substs) => {
-                if ty.is_box() {
-                    worklist.push((ty.boxed_ty(), borrowed));
+                if let Some(boxed_ty) = ty.boxed_ty() {
+                    worklist.push((boxed_ty, borrowed));
                     continue;
                 }
 

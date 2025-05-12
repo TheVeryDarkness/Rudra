@@ -75,9 +75,10 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         copy_trait_did: DefId,
     ) {
         // Iterate over `impl`s that implement `Send`.
-        let hir = self.rcx.tcx().hir();
+        let tcx = self.rcx.tcx();
+        let hir = tcx.hir();
         for &impl_id in hir.trait_impls(send_trait_did) {
-            let owner_id = hir.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
+            let owner_id = tcx.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
             let item = hir.item(ItemId { owner_id });
             if_chain! {
                 if let ItemKind::Impl(impl_item) = &item.kind;
@@ -111,9 +112,10 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
         copy_trait_did: DefId,
     ) {
         // Iterate over `impl`s that implement `Sync`.
-        let hir = self.rcx.tcx().hir();
+        let tcx = self.rcx.tcx();
+        let hir = tcx.hir();
         for &impl_id in hir.trait_impls(sync_trait_did) {
-            let owner_id = hir.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
+            let owner_id = tcx.local_def_id_to_hir_id(impl_id).as_owner().unwrap();
             let item = hir.item(ItemId { owner_id });
             if_chain! {
                 if let ItemKind::Impl(impl_item) = &item.kind;

@@ -3,6 +3,7 @@
 extern crate rustc_driver;
 extern crate rustc_errors;
 extern crate rustc_interface;
+extern crate rustc_middle;
 extern crate rustc_session;
 extern crate rustc_span;
 
@@ -12,12 +13,14 @@ extern crate log;
 use std::env;
 
 use rustc_driver::Compilation;
-use rustc_interface::{interface::Compiler, Queries};
+use rustc_interface::interface::Compiler;
 
 use rudra::log::Verbosity;
 use rudra::report::{default_report_logger, init_report_logger, ReportLevel};
 use rudra::{analyze, compile_time_sysroot, progress_info, RudraConfig, RUDRA_DEFAULT_ARGS};
-use rustc_session::{config::ErrorOutputType, EarlyErrorHandler};
+use rustc_middle::ty::TyCtxt;
+use rustc_session::config::ErrorOutputType;
+use rustc_session::EarlyDiagCtxt;
 use rustc_span::def_id::LOCAL_CRATE;
 
 struct RudraCompilerCalls {
@@ -31,12 +34,8 @@ impl RudraCompilerCalls {
 }
 
 impl rustc_driver::Callbacks for RudraCompilerCalls {
-    fn after_analysis<'tcx>(
-        &mut self,
-        compiler: &Compiler,
-        queries: &'tcx Queries<'tcx>,
-    ) -> Compilation {
-        compiler.sess.abort_if_errors();
+    fn after_analysis<'tcx>(&mut self, compiler: &Compiler, tcx: TyCtxt<'tcx>) -> Compilation {
+        compiler.sess.dcx().abort_if_errors();
 
         rudra::log::setup_logging(self.config.verbosity).expect("Rudra failed to initialize");
 
@@ -46,13 +45,11 @@ impl rustc_driver::Callbacks for RudraCompilerCalls {
         );
 
         progress_info!("Rudra started");
-        queries.global_ctxt().unwrap().enter(|tcx| {
-            debug!("Crate name: {}", tcx.crate_name(LOCAL_CRATE));
-            analyze(tcx, self.config);
-        });
+        debug!("Crate name: {}", tcx.crate_name(LOCAL_CRATE));
+        analyze(tcx, self.config);
         progress_info!("Rudra finished");
 
-        compiler.sess.abort_if_errors();
+        compiler.sess.dcx().abort_if_errors();
         Compilation::Stop
     }
 }
@@ -85,9 +82,8 @@ fn run_compiler(
     );
 
     // Invoke compiler, and handle return code.
-    let exit_code = rustc_driver::catch_with_exit_code(move || {
-        rustc_driver::RunCompiler::new(&args, callbacks).run()
-    });
+    let exit_code =
+        rustc_driver::catch_with_exit_code(move || rustc_driver::run_compiler(&args, callbacks));
 
     exit_code
 }
@@ -124,7 +120,7 @@ fn parse_config() -> (RudraConfig, Vec<String>) {
 }
 
 fn main() {
-    let handler = EarlyErrorHandler::new(ErrorOutputType::default());
+    let handler = EarlyDiagCtxt::new(ErrorOutputType::default());
 
     rustc_driver::install_ice_hook(rustc_driver::DEFAULT_BUG_REPORT_URL, |_| ()); // ICE: Internal Compilation Error
 

@@ -121,7 +121,7 @@ pub(crate) fn adt_behavior<'tcx>(
     // For ADT `Foo<A, B>` => adt_ty_name = `Foo`
     let adt_ty_name = tcx.item_name(adt_did);
 
-    let adt_generic_params = &tcx.generics_of(adt_did).params;
+    let adt_generic_params = &tcx.generics_of(adt_did).own_params;
 
     if let Some(relevant_impls) = rcx.index_adt_cache(&adt_did) {
         // Inspect `impl`s relevant to the given ADT.
@@ -151,7 +151,7 @@ pub(crate) fn adt_behavior<'tcx>(
                         if assoc_item.kind == AssocKind::Fn {
                             let fn_did = assoc_item.def_id;
                             let fn_sig = tcx.fn_sig(fn_did).skip_binder();
-                            if let rustc_hir::Unsafety::Unsafe = fn_sig.unsafety() {
+                            if let rustc_hir::Safety::Unsafe = fn_sig.safety() {
                                 return None;
                             }
                             if assoc_item.fn_has_self_parameter {

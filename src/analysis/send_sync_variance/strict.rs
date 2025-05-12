@@ -37,7 +37,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
 
                 // Initialize sets `need_send` & `need_sync`.
                 if adt_def.is_struct() {
-                    for gen_param in tcx.generics_of(adt_did).params.iter() {
+                    for gen_param in tcx.generics_of(adt_did).own_params.iter() {
                         if let GenericParamDefKind::Type { .. } = gen_param.kind {
                             let post_map_idx = PostMapIdx(gen_param.index);
                             let mut analyses = BehaviorFlag::NAIVE_SYNC_FOR_SYNC;
@@ -64,7 +64,7 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
                 } else {
                     // Fields of enums/unions can be accessed by pattern matching.
                     // In this case, we require all generic parameters to be `Sync`.
-                    for gen_param in tcx.generics_of(adt_did).params.iter() {
+                    for gen_param in tcx.generics_of(adt_did).own_params.iter() {
                         if let GenericParamDefKind::Type { .. } = gen_param.kind {
                             let post_map_idx = PostMapIdx(gen_param.index);
                             let mut analyses = BehaviorFlag::NAIVE_SYNC_FOR_SYNC;
@@ -89,8 +89,10 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
 
                 // If the below assertion fails, there must be an issue with librustc we're using.
                 // assert_eq!(tcx.generics_of(adt_did).params.len(), substs.len());
-                let generic_param_idx_map =
-                    generic_param_idx_mapper(&tcx.generics_of(adt_did).params, impl_trait_substs);
+                let generic_param_idx_map = generic_param_idx_mapper(
+                    &tcx.generics_of(adt_did).own_params,
+                    impl_trait_substs,
+                );
 
                 // Iterate over predicates to check trait bounds on generic params.
                 for atom in tcx
@@ -172,11 +174,13 @@ impl<'tcx> SendSyncVarianceChecker<'tcx> {
 
                 // If the below assertion fails, there must be an issue with librustc we're using.
                 // assert_eq!(tcx.generics_of(adt_did).params.len(), substs.len());
-                let generic_param_idx_map =
-                    generic_param_idx_mapper(&tcx.generics_of(adt_did).params, impl_trait_substs);
+                let generic_param_idx_map = generic_param_idx_mapper(
+                    &tcx.generics_of(adt_did).own_params,
+                    impl_trait_substs,
+                );
 
                 // Initialize set `need_send`
-                for gen_param in tcx.generics_of(adt_did).params.iter() {
+                for gen_param in tcx.generics_of(adt_did).own_params.iter() {
                     if let GenericParamDefKind::Type { .. } = gen_param.kind {
                         let post_map_idx = PostMapIdx(gen_param.index);
                         let mut analyses = BehaviorFlag::NAIVE_SEND_FOR_SEND;

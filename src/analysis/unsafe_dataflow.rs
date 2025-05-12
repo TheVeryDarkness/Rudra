@@ -90,6 +90,8 @@ impl<'tcx> UnsafeDataflowChecker<'tcx> {
 }
 
 mod inner {
+    use rustc_middle::ty::TypingEnv;
+
     use super::*;
 
     #[derive(Debug, Default)]
@@ -122,6 +124,7 @@ mod inner {
         rcx: RudraCtxt<'tcx>,
         body: &'a ir::Body<'tcx>,
         param_env: ParamEnv<'tcx>,
+        typing_env: TypingEnv<'tcx>,
         status: UnsafeDataflowStatus,
     }
 
@@ -131,6 +134,7 @@ mod inner {
                 rcx,
                 body,
                 param_env,
+                typing_env: body.original.typing_env(rcx.tcx()),
                 status: Default::default(),
             }
         }
@@ -191,7 +195,7 @@ mod inner {
                             }
 
                             if ext.match_def_path(callee_did, &VEC_SET_LEN)
-                                && vec_set_len_to_0(self.rcx, callee_did, args)
+                                && vec_set_len_to_0(self.rcx, self.typing_env, callee_did, args)
                             {
                                 // Leaking data is safe (`vec.set_len(0);`)
                                 continue;
@@ -223,9 +227,9 @@ mod inner {
                                 .push(terminator.original.source_info.span);
                         } else {
                             // Check for unresolvable generic function calls
-                            match Instance::resolve(
+                            match Instance::try_resolve(
                                 self.rcx.tcx(),
-                                self.param_env,
+                                self.typing_env,
                                 callee_did,
                                 callee_substs,
                             ) {
@@ -267,9 +271,8 @@ mod inner {
                         if_chain! {
                             if let Operand::Move(place) = arg;
                             let place_ty = place.ty(self.body, tcx);
-                            if let TyKind::RawPtr(ty_and_mut) = place_ty.ty.kind();
-                            let pointed_ty = ty_and_mut.ty;
-                            if pointed_ty.is_copy_modulo_regions(tcx, self.param_env);
+                            if let TyKind::RawPtr(pointed_ty, _) = place_ty.ty.kind();
+                            if tcx.type_is_copy_modulo_regions(self.typing_env, *pointed_ty);
                             then {
                                 return true;
                             }
@@ -307,7 +310,8 @@ mod inner {
     // Check if the argument of `Vec::set_len()` is 0_usize.
     fn vec_set_len_to_0<'tcx>(
         rcx: RudraCtxt<'tcx>,
-        callee_did: DefId,
+        typing_env: TypingEnv<'tcx>,
+        _callee_did: DefId,
         args: &Vec<Operand<'tcx>>,
     ) -> bool {
         let tcx = rcx.tcx();
@@ -316,7 +320,7 @@ mod inner {
                 if let Operand::Constant(c) = arg;
                 if let Some(c_val) = c.const_.try_eval_target_usize(
                     tcx,
-                    tcx.param_env(callee_did),
+                    typing_env,
                 );
                 if c_val == 0;
                 then {

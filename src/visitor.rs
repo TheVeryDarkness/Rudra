@@ -44,7 +44,7 @@ impl<'tcx> intravisit::Visitor<'tcx> for RelatedFnCollector<'tcx> {
         let hir_map = self.tcx.hir();
         match &item.kind {
             ItemKind::Impl(Impl {
-                unsafety: _unsafety,
+                safety: _safety,
                 generics: _generics,
                 self_ty,
                 items: impl_items,
@@ -57,7 +57,7 @@ impl<'tcx> intravisit::Visitor<'tcx> for RelatedFnCollector<'tcx> {
                     let local_def_id = impl_item_ref.id.owner_id.def_id;
                     hir_map
                         .maybe_body_owned_by(local_def_id)
-                        .map(|body_id| (body_id, impl_item_ref.span))
+                        .map(|body| (body.id(), impl_item_ref.span))
                 }));
             }
             // Free-standing (top level) functions and default trait impls have `None` as a key.
@@ -69,10 +69,10 @@ impl<'tcx> intravisit::Visitor<'tcx> for RelatedFnCollector<'tcx> {
                     let local_def_id = trait_item_ref.id.owner_id.def_id;
                     hir_map
                         .maybe_body_owned_by(local_def_id)
-                        .map(|body_id| (body_id, trait_item_ref.span))
+                        .map(|body| (body.id(), trait_item_ref.span))
                 }));
             }
-            ItemKind::Fn(_fn_sig, _generics, body_id) => {
+            ItemKind::Fn { body: body_id, .. } => {
                 let key = None;
                 let entry = self.hash_map.entry(key).or_insert(Vec::new());
                 entry.push((*body_id, item.span));
@@ -147,7 +147,7 @@ pub type AdtImplMap<'tcx> = FxHashMap<DefId, Vec<(LocalDefId, Ty<'tcx>)>>;
 pub fn create_adt_impl_map<'tcx>(tcx: TyCtxt<'tcx>) -> AdtImplMap<'tcx> {
     let mut map = FxHashMap::default();
 
-    for id in tcx.hir_crate_items(()).items() {
+    for id in tcx.hir_crate_items(()).free_items() {
         let item = tcx.hir().item(id);
         if let ItemKind::Impl(Impl { self_ty, .. }) = item.kind {
             // `Self` type of the given impl block.

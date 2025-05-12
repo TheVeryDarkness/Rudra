@@ -1,8 +1,8 @@
 //! Unsafe destructor detector
 use rustc_hir::def_id::DefId;
-use rustc_hir::intravisit::{self, Visitor};
+use rustc_hir::intravisit::{self, Map, Visitor};
 use rustc_hir::{
-    Block, BodyId, Expr, HirId, Impl, ImplItemId, ImplItemKind, ItemKind, Node, Unsafety,
+    Block, BodyId, Expr, HirId, Impl, ImplItemId, ImplItemKind, ItemKind, Node, Safety,
 };
 use rustc_middle::hir::nested_filter::OnlyBodies;
 use rustc_middle::ty::TyCtxt;
@@ -55,7 +55,7 @@ impl<'tcx> UnsafeDestructorChecker<'tcx> {
             let tcx = self.rcx.tcx();
             if inner::UnsafeDestructorVisitor::check_drop_unsafety(
                 self.rcx,
-                tcx.hir().local_def_id_to_hir_id(impl_item),
+                tcx.local_def_id_to_hir_id(impl_item),
                 drop_trait_def_id,
             ) {
                 rudra_report(Report::with_hir_id(
@@ -100,8 +100,8 @@ mod inner {
             let mut visitor = UnsafeDestructorVisitor::new(rcx);
 
             let map = visitor.rcx.tcx().hir();
+            let node = map.hir_node(hir_id);
             if_chain! {
-                if let Some(node) = map.find(hir_id);
                 if let Node::Item(item) = node;
                 if let ItemKind::Impl(Impl { of_trait: Some(ref trait_ref), items, .. }) = item.kind;
                 if Some(drop_trait_def_id) == trait_ref.trait_def_id();
@@ -166,7 +166,7 @@ mod inner {
                 // If non-extern unsafe function call is detected in unsafe block
                 if let Some(fn_def_id) = expr.ext().as_fn_def_id(tcx) {
                     let ty = tcx.type_of(fn_def_id).skip_binder();
-                    if let Ok(Unsafety::Unsafe) = tcx.ext().fn_type_unsafety(ty) {
+                    if let Ok(Safety::Unsafe) = tcx.ext().fn_type_unsafety(ty) {
                         if !tcx.is_foreign_item(fn_def_id) {
                             self.unsafe_found = true;
                         }
