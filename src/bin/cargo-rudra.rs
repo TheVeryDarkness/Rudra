@@ -1,3 +1,4 @@
+#![feature(rustc_private)]
 ///! This implementation is based on `cargo-miri`
 ///! https://github.com/rust-lang/miri/blob/master/src/bin/cargo-miri.rs
 #[macro_use]
